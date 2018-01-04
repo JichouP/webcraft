@@ -2,6 +2,26 @@
 
 2D Open-world multiplayer platform
 
+# Install
+
+```bash
+yarn install
+```
+
+OR
+```bash
+npm install
+```
+
+# ローカルテスト
+```bash
+php -S localhost:8000
+```
+OR
+```bash
+python3 -m http.server 8000
+```
+
 # 案
 
 * アイテムやマップチップをアップロードできる
