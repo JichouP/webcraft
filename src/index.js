@@ -27,7 +27,9 @@ app.renderer.resize(512, 512);
 document.body.appendChild(app.view);
 
 const chickenSrc = './img/chicken.png';
-const mapchipSrc = './img/mapchip.png';
+const mapchipSrc = './img/mapchip.json';
+
+const stageHeight = 512;
 
 PIXI.loader
   .add([
@@ -62,105 +64,162 @@ function randomInt(max = 32768, min = 0) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
   
-function setup() {
-  PIXI.loader.resources[chickenSrc].texture.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
-  const chicken = new PIXI.Sprite(
-    PIXI.loader.resources[chickenSrc].texture
+  
+/**
+ * エンティティの追加・削除を行う
+ */
+class EntityManager extends Container{
+  constructor(entities, root) {
+    super();
+    this.entities = entities;
+    root.addChild(this);
+  }
+  add(entity) {
+    this.addChild(entity);
+    this.entities.push(entity);
+  }
+}
+
+/**
+ * ゲーム状態(state)の保持を行う
+ * 基本的にここ以外にゲームの情報を持たせてはいけない
+ */
+class Store {
+  constructor(app) {
+    this.state = this.getInitState();
+    this.entity = new EntityManager(this.state.entities, app.stage);
+  }
+  getInitState() {
+    return {
+      entities: [],
+    }
+  }
+  update(delta) {
+    for (const i of this.entity.entities) {
+      i.update(delta);
+    }
+  }
+}
+
+class Entity extends Sprite {
+  constructor(...args) {
+    super(...args);
+    this.vx = 0;
+    this.vy = 0;
+    this.isOnFloor = false;
+    this.MoveState = {
+      Jump: {
+        keyboard: {
+          right: {
+            press: this.moveRight.bind(this),
+          },
+          left: {
+            press: this.moveLeft.bind(this),
+          },
+        },
+        update: this.jumpUpdate.bind(this),
+      },
+      Walk: {
+        keyboard: {
+          up: {
+            press: this.jump.bind(this),
+          },           
+          right: {
+            press: this.moveRight.bind(this),
+          },
+          left: {
+            press: this.moveLeft.bind(this),
+          },
+        },
+        update: () => {},
+      },
+    };
+    this.moveState = this.MoveState.Jump;
+    this.keyboard = {
+      left: keyboard(37),
+      up: keyboard(38),
+      right: keyboard(39),
+      down: keyboard(40),
+    };
+    for (const i of Object.keys(this.keyboard)) {
+      this.keyboard[i].press = () => {
+        console.log('Key Pressed: ' + i);
+        if (this.moveState.keyboard[i] !== undefined) {
+          if (this.moveState.keyboard[i].press !== undefined) {
+            this.moveState.keyboard[i].press();
+          }
+        }
+      };
+    }
+  }
+  
+  moveRight() {
+    
+  }
+  moveLeft() {}
+  
+  jumpUpdate() {
+    // 床判定
+    this.addGravity();
+    if (this.y > stageHeight) {
+      this.nextMoveState = this.MoveState.Walk;
+      this.y = stageHeight - 1;
+      this.vy = 0;
+    }
+  }
+  
+  jump() {
+    console.log('Jumped');
+    this.vy = -4;
+    this.nextMoveState = this.MoveState.Jump;
+  }
+  
+  addGravity(g = 0.1) {
+    this.vy += g;
+  }
+  
+  update(delta) {
+    this.x += this.vx * (1 + delta);
+    this.y += this.vy * (1 + delta);
+    
+    this.moveState.update();
+    if (this.nextMoveState != null) {
+      this.moveState = this.nextMoveState;
+      this.nextMoveState = null;
+      console.log('moveState changed.')
+    }
+  }
+}
+
+function genTestPlayer() {
+  const player = new Entity(
+    resources[chickenSrc].texture
   );
   
+  player.x = 100;
+  player.y = 200;
+  player.anchor.x = 0.5;
+  player.anchor.y = 0.5;
   
-  chicken.x = 100;
-  chicken.y = 200;
-  chicken.width = 64;
-  chicken.height = 64;
-  chicken.rotation = 0.5;
-  chicken.anchor.x = 0.5;
-  chicken.anchor.y = 0.5;
-  app.stage.addChild(chicken);
+  return player;
+}
   
-  const mapchipTexture = TextureCache[mapchipSrc];
-  const rectangle = new Rectangle(16, 0, 16, 16);
-  mapchipTexture.frame = rectangle;
-  const chip = new Sprite(mapchipTexture);
-  chip.x = 32;
-  chip.y = 32;
-  chicken.vx = 0;
-  chicken.vy = 0;
+function setup() {
+  // スケールモード設定
+  /*for (const i of resources) {
+    i.texture.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
+  }*/
   
-    const left = keyboard(37),
-    up = keyboard(38),
-    right = keyboard(39),
-    down = keyboard(40);
-      //Left arrow key `press` method
-  left.press = () => {
-    //Change the chicken's velocity when the key is pressed
-    chicken.vx = -5;
-    chicken.vy = 0;
-  };
-  
-  //Left arrow key `release` method
-  left.release = () => {
-    //If the left arrow has been released, and the right arrow isn't down,
-    //and the chicken isn't moving vertically:
-    //Stop the chicken
-    if (!right.isDown && chicken.vy === 0) {
-      chicken.vx = 0;
-    }
-  };
+  const player = genTestPlayer();
+  //const player = new Entity(resources[chickenSrc].texture);
+  //const player = new Entity(resources[chickenSrc].texture);
 
-  //Up
-  up.press = () => {
-    chicken.vy = -5;
-    chicken.vx = 0;
-  };
-  up.release = () => {
-    if (!down.isDown && chicken.vx === 0) {
-      chicken.vy = 0;
-    }
-  };
-
-  //Right
-  right.press = () => {
-    chicken.vx = 5;
-    chicken.vy = 0;
-  };
-  right.release = () => {
-    if (!left.isDown && chicken.vy === 0) {
-      chicken.vx = 0;
-    }
-  };
-
-  //Down
-  down.press = () => {
-    chicken.vy = 5;
-    chicken.vx = 0;
-  };
-  down.release = () => {
-    if (!up.isDown && chicken.vx === 0) {
-      chicken.vy = 0;
-    }
-  };
-  
-  
-  const rectangle2 = new Rectangle(32, 0, 16, 16);
-  mapchipTexture.frame = rectangle2;
-  const chip2 = new Sprite(mapchipTexture);
-  chip2.x = 48;
-  chip2.y = 32;
-  
-  const container = new Container();
-  container.addChild(chip);
-  container.addChild(chip2);
-  app.stage.addChild(container);
-  
+  const store = new Store(app);
+  store.entity.add(player);
   
   app.ticker.add(delta => {
-    //chicken.x += 1 + delta;
-    container.x += 1;
-    chicken.x += chicken.vx * (1 * delta);
-    chicken.y += chicken.vy * (1 * delta);
+    store.update(delta);
   });
-
 }
 
 function keyboard(keyCode) {
