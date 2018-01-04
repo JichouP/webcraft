@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "pixi.js": "^4.6.2",
+    "websocket": "^1.0.25"
+  },
+  "scripts": {
+    "start": "parcel index.html"
+  }
+}
